@@ -21,6 +21,7 @@ import { Tip } from 'src/tips/tip.entity';
 import { PeertubeProvider } from './providers/peertube.provider';
 import { KickProvider } from './providers/kick.provider';
 import { XProvider } from './providers/x.provider';
+import { LivePushService } from '../live-push/live-push.service';
 
 @Injectable()
 export class LiveStreamsService implements OnModuleInit {
@@ -39,6 +40,7 @@ export class LiveStreamsService implements OnModuleInit {
     @InjectRepository(Page) private pagesRepo: Repository<Page>,
     @InjectRepository(Link) private linkRepo: Repository<Link>,
     @InjectQueue('live-stream') private liveStreamQueue: Queue,
+    private readonly livePush: LivePushService,
   ) {}
 
   onModuleInit() {
@@ -77,11 +79,12 @@ export class LiveStreamsService implements OnModuleInit {
 
   async updateLiveStreams(dto: CreateLiveStreamDto[]) {
     await this.repo.manager.transaction(async (manager) => {
+      const snapshot = await this.livePush.updateSnapshot(manager, dto);
       // Delete all existing streams
       await manager.delete(LiveStream, {});
 
       if (!dto.length) return;
-      const created = dto.map((stream) => {
+      const created = snapshot.map((stream) => {
         return this.repo.create({
           platform: stream.platform,
           title: stream.title,
